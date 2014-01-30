@@ -3,8 +3,11 @@ server  = percona["server"]
 conf    = percona["conf"]
 mysqld  = (conf && conf["mysqld"]) || {}
 
-# construct an encrypted passwords helper -- giving it the node and bag name
-passwords = EncryptedPasswords.new(node, percona["encrypted_data_bag"])
+if node["percona"]["skip_databags"]
+  passwords = AttributePasswords.new(node)
+else
+  passwords = EncryptedPasswords.new(node, percona["encrypted_data_bag"])
+end
 
 template "/root/.my.cnf" do
   variables(:root_password => passwords.root_password)

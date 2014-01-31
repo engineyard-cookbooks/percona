@@ -1,10 +1,12 @@
+#::Chef::Recipe.send(:include, Percona::AttributePasswords)
+
 percona = node["percona"]
 server  = percona["server"]
 conf    = percona["conf"]
 mysqld  = (conf && conf["mysqld"]) || {}
 
 if node["percona"]["skip_databags"]
-  passwords = AttributePasswords.new(node)
+  passwords = ::Percona::AttributePasswords.new(node)
 else
   passwords = EncryptedPasswords.new(node, percona["encrypted_data_bag"])
 end

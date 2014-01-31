@@ -1,18 +1,16 @@
-#::Chef::Recipe.send(:include, Percona::AttributePasswords)
+if node["percona"]["skip_databags"]
+  #extend Percona::AttributePasswords
+else
+  #passwords = EncryptedPasswords.new(node, percona["encrypted_data_bag"])
+end
 
 percona = node["percona"]
 server  = percona["server"]
 conf    = percona["conf"]
 mysqld  = (conf && conf["mysqld"]) || {}
 
-if node["percona"]["skip_databags"]
-  passwords = ::Percona::AttributePasswords.new(node)
-else
-  passwords = EncryptedPasswords.new(node, percona["encrypted_data_bag"])
-end
-
 template "/root/.my.cnf" do
-  variables(:root_password => passwords.root_password)
+  variables(:root_password => ::Percona::AttributePasswords.root_password)
   owner "root"
   group "root"
   mode 0600

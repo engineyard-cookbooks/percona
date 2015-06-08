@@ -30,6 +30,7 @@ template "/root/.my.cnf" do
   mode "0600"
   source "my.cnf.root.erb"
   sensitive true
+  notifies :run, "execute[Update MySQL root password]", :immediately
   not_if { node["percona"]["skip_passwords"] }
 end
 
@@ -106,6 +107,11 @@ service "mysql" do
   action server["enable"] ? :enable : :disable
 end
 
+# install SSL certificates before config phase
+if node["percona"]["server"]["replication"]["ssl_enabled"]
+  include_recipe "percona::ssl"
+end
+
 # install db to the data directory
 execute "setup mysql datadir" do
   command "mysql_install_db --defaults-file=#{percona["main_config_file"]} --user=#{user}" # rubocop:disable LineLength
@@ -113,9 +119,12 @@ execute "setup mysql datadir" do
   action :nothing
 end
 
-# install SSL certificates before config phase
-if node["percona"]["server"]["replication"]["ssl_enabled"]
-  include_recipe "percona::ssl"
+# set the root password only if this is the initial install
+execute "Update MySQL root password" do
+  root_pw = passwords.root_password
+  command "mysqladmin --user=root --password='' password '#{root_pw}'"
+  only_if "mysqladmin --user=root --password='' version"
+  action :nothing
 end
 
 # setup the main server config file
@@ -144,6 +153,7 @@ unless node["percona"]["skip_passwords"]
     only_if "mysqladmin --user=root --password='' version"
     sensitive true
   end
+  not_if { node["percona"]["skip_passwords"] }
 end
 
 # setup the debian system user config
@@ -155,7 +165,21 @@ template "/etc/mysql/debian.cnf" do
   mode "0640"
   sensitive true
   if node["percona"]["auto_restart"]
-    notifies :restart, "service[mysql]", :immediately
+    # Just queue it up in case. Next block will do it right away.
+    notifies :restart, "service[mysql]"
   end
   only_if { platform_family?("debian") }
+end
+
+# setup the main server config file
+template percona["main_config_file"] do
+  source "my.cnf.#{server["role"] == "cluster" ? "cluster" : "main"}.erb"
+  owner "root"
+  group "root"
+  mode "0644"
+
+  notifies :run, "execute[setup mysql datadir]", :immediately
+  if node["percona"]["auto_restart"]
+    notifies :restart, "service[mysql]", :immediately
+  end
 end

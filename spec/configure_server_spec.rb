@@ -78,10 +78,6 @@ describe "percona::configure_server" do
         recursive: true
       )
     end
-
-    it "updates the root user password" do
-      expect(chef_run).to run_execute("Update MySQL root password")
-    end
   end
 
   describe "subsequent runs" do
@@ -112,6 +108,8 @@ describe "percona::configure_server" do
       )
 
       expect(chef_run).to render_file("/root/.my.cnf").with_content("s3kr1t")
+      resource = chef_run.template("/root/.my.cnf")
+      expect(resource).to notify("execute[Update MySQL root password]").to(:run).immediately # rubocop:disable LineLength
     end
 
     it "creates the configuration directory" do
@@ -197,7 +195,7 @@ describe "percona::configure_server" do
       expect(chef_run).to render_file(debian_cnf).with_content("d3b1an")
 
       resource = chef_run.template(debian_cnf)
-      expect(resource).to notify("service[mysql]").to(:restart).immediately
+      expect(resource).to notify("service[mysql]").to(:restart)
     end
   end
 
